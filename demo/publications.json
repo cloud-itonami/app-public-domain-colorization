@@ -1,0 +1,52 @@
+{
+  "generatedAt": "2026-04-29T06:25:00Z",
+  "gatewayBaseUrl": "https://ipfs.etzhayyim.com/ipfs",
+  "pdsBaseUrl": "https://atproto.etzhayyim.com",
+  "publications": [
+    {
+      "slug": "gertie-the-dinosaur-1914",
+      "title": "Gertie the Dinosaur",
+      "year": 1914,
+      "workKind": "animation",
+      "workId": "pdcolor:work:gertie-the-dinosaur-1914",
+      "runVertexId": "pdcolor:run:publish:gertie-worker-real-v6",
+      "derivativeVertexId": "pdcolor:derivative:publish:gertie-worker-real-v6",
+      "publishJurisdiction": "US",
+      "sourceLanguage": "en",
+      "targetLanguages": ["ja", "en", "es", "fr", "zh-Hans", "ko"],
+      "voicePolicy": "narration-neutral",
+      "status": "published",
+      "publishedAt": "2026-04-29T05:38:35.431Z",
+      "source": {
+        "archiveUrl": "https://archive.org/details/Gertie",
+        "sourceIpfsCid": "bafybeifeqsv57dnlfvhjhwm6aah6emxljva2tkbshd7x6tfubw7ow4opue",
+        "sourceIpfsUrl": "https://ipfs.etzhayyim.com/ipfs/bafybeifeqsv57dnlfvhjhwm6aah6emxljva2tkbshd7x6tfubw7ow4opue",
+        "sourceFilename": "gertie-the-dinosaur-1914.mp4",
+        "sourceContentType": "video/mp4"
+      },
+      "publication": {
+        "cid": "3mkmf36owkk2m",
+        "uri": "at://did:web:pd-color.etzhayyim.com/com.etzhayyim.apps.publicDomainColorization.publication/3mkmf36owkk2m",
+        "repo": "did:web:pd-color.etzhayyim.com",
+        "collection": "com.etzhayyim.apps.publicDomainColorization.publication",
+        "rkey": "3mkmf36owkk2m",
+        "recordUrl": "https://atproto.etzhayyim.com/xrpc/com.atproto.repo.getRecord?repo=did%3Aweb%3Apd-color.etzhayyim.com&collection=com.etzhayyim.apps.publicDomainColorization.publication&rkey=3mkmf36owkk2m"
+      },
+      "assets": {
+        "masterVideoCid": "bafkreibf2d5q7t4thvtro2qjomq4ejytqlv2rh3z5vg5otrpwngma4fice",
+        "posterCid": "bafkreiejn77zr55savxprwoc3wdp5ijzy7kttg6n4fhqzi3ucaerpbvl6y",
+        "publicationManifestCid": "bafkreibf2d5q7t4thvtro2qjomq4ejytqlv2rh3z5vg5otrpwngma4fice",
+        "subtitleManifestCid": "bafkreigoyykv7ckdivx463qtjw4nldd43rrwkwa5iad5deatzxh7xffvle",
+        "dubbedAudioManifestCid": "bafkreih6vpbhmtesxw6cibm74flkmzz6q54g6drbxwmpjy2765moekqp3y",
+        "localizedPackageManifestCid": "bafkreifoyld7dyj7urialgcq357w5n6yhnrdveosspeukflcw6ablv2t6e",
+        "rightsEvidenceCid": "bafkreigah4hd3vf3poqc5fmi6w2bbrn674bfatpq3yrckr2hfvott5l3qu"
+      },
+      "rights": {
+        "classification": "public-domain",
+        "reviewerDid": "did:web:pd-color.etzhayyim.com",
+        "evidenceUri": "ipfs://bafkreigah4hd3vf3poqc5fmi6w2bbrn674bfatpq3yrckr2hfvott5l3qu",
+        "notice": "Demo publication. Public-domain status is recorded for the requested jurisdiction and must be re-reviewed for other jurisdictions or different source editions."
+      }
+    }
+  ]
+}

@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PD Color Demo</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">pd-color.etzhayyim.com</p>
+          <h1>Public-domain colorization catalog</h1>
+        </div>
+        <div class="status-pill" id="catalog-status">Loading catalog</div>
+      </header>
+
+      <section class="viewer-grid">
+        <article class="player-panel">
+          <div class="video-frame">
+            <video id="source-video" controls preload="metadata"></video>
+          </div>
+          <div class="player-meta">
+            <div>
+              <h2 id="work-title">Loading</h2>
+              <p id="work-summary"></p>
+            </div>
+            <a id="archive-link" class="icon-button" href="#" target="_blank" rel="noreferrer" title="Open source archive">Archive</a>
+          </div>
+        </article>
+
+        <aside class="detail-panel">
+          <div class="record-head">
+            <span class="record-status" id="record-status">pending</span>
+            <span id="published-at"></span>
+          </div>
+          <dl class="facts">
+            <div><dt>Publication CID</dt><dd id="publication-cid"></dd></div>
+            <div><dt>AT URI</dt><dd id="publication-uri"></dd></div>
+            <div><dt>Run</dt><dd id="run-id"></dd></div>
+            <div><dt>Rights</dt><dd id="rights-summary"></dd></div>
+          </dl>
+          <div class="language-row" id="languages"></div>
+        </aside>
+      </section>
+
+      <section class="asset-section">
+        <div class="section-head">
+          <h2>Published assets</h2>
+          <p>Manifest links resolve through ipfs.etzhayyim.com and the PDS record resolves through atproto.etzhayyim.com.</p>
+        </div>
+        <div class="asset-grid" id="asset-grid"></div>
+      </section>
+
+      <section class="record-section">
+        <div class="section-head">
+          <h2>Record payload</h2>
+          <a id="record-link" href="#" target="_blank" rel="noreferrer">Open live PDS record</a>
+        </div>
+        <pre id="record-json">{}</pre>
+      </section>
+    </main>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

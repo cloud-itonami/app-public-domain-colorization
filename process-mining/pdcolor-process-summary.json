@@ -1,0 +1,44 @@
+{
+  "activityCount": 11,
+  "caseCount": 13,
+  "eventCount": 68,
+  "generatedAt": "2026-04-29T08:01:11Z",
+  "latestPublishedCase": {
+    "activity": "05 Published",
+    "artifact_id": "pdcolor:publication:pdcolor:derivative:publish:gertie-worker-real-v6",
+    "case_id": "pdcolor:run:publish:gertie-worker-real-v6",
+    "detail": "3mkmf36owkk2m",
+    "lifecycle": "complete",
+    "resource": "sys.bpmn.pd-color",
+    "timestamp": "2026-04-29T05:38:35.431@GMT",
+    "work_id": "pdcolor:work:gertie-the-dinosaur-1914"
+  },
+  "publishedCaseCount": 4,
+  "source": "RisingWave view_pd_color_process_event_log",
+  "variants": [
+    {
+      "count": 4,
+      "variant": "01 Candidate persisted"
+    },
+    {
+      "count": 4,
+      "variant": "01 Candidate persisted > 02 Rights approved > 03 Derivatives ready > 04 Localization ready > 05 Published"
+    },
+    {
+      "count": 2,
+      "variant": "01 Candidate persisted > 02 Rights approved > 03 Derivatives ready > 04 Localization ready"
+    },
+    {
+      "count": 1,
+      "variant": "01 Candidate persisted > 03 Derivatives ready"
+    },
+    {
+      "count": 1,
+      "variant": "Restore frames"
+    },
+    {
+      "count": 1,
+      "variant": "01 Candidate persisted > 02 Rights approved"
+    }
+  ]
+}

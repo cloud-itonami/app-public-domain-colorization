@@ -1,0 +1,102 @@
+{
+  "generatedAt": "2026-04-29T00:00:00Z",
+  "notes": [
+    "Demo candidates are intentionally short, well-known public-domain-era works with public archive URLs.",
+    "The pipeline must still store per-work rights evidence before publication; this file is a demo ingest queue, not a legal conclusion."
+  ],
+  "works": [
+    {
+      "slug": "gertie-the-dinosaur-1914",
+      "workId": "pdcolor:work:gertie-the-dinosaur-1914",
+      "title": "Gertie the Dinosaur",
+      "workKind": "animation",
+      "year": 1914,
+      "sourceLanguage": "en",
+      "sourceUrl": "https://archive.org/download/Gertie/GertietheDinosaur.mp4",
+      "sourceIpfsCid": "bafybeifeqsv57dnlfvhjhwm6aah6emxljva2tkbshd7x6tfubw7ow4opue",
+      "sourceIpfsUrl": "https://ipfs.etzhayyim.com/ipfs/bafybeifeqsv57dnlfvhjhwm6aah6emxljva2tkbshd7x6tfubw7ow4opue",
+      "sourcePageUrl": "https://archive.org/details/Gertie",
+      "sourceFilename": "gertie-the-dinosaur-1914.mp4",
+      "sourceContentType": "video/mp4",
+      "sourceByteSize": 39234070,
+      "sourceSha256": "8c032769f14f7e545c8ab4aa1bb1b5d950b84268237ca7ecce19b6e8c8ac0237",
+      "publishJurisdiction": "US",
+      "targetLanguages": ["ja", "en", "es", "fr", "zh-Hans", "ko"],
+      "voicePolicy": "narration-neutral",
+      "voiceLipSync": false,
+      "rightsEvidence": [
+        {
+          "kind": "archive-page",
+          "url": "https://archive.org/details/Gertie",
+          "note": "Internet Archive item page for the source file."
+        },
+        {
+          "kind": "publication-year",
+          "value": "1914",
+          "note": "First-publication era is before the current U.S. public-domain cutoff."
+        }
+      ]
+    },
+    {
+      "slug": "steamboat-willie-1928",
+      "workId": "pdcolor:work:steamboat-willie-1928",
+      "title": "Steamboat Willie",
+      "workKind": "animation",
+      "year": 1928,
+      "sourceLanguage": "en",
+      "sourceUrl": "https://archive.org/download/SteamboatWillie/Steamboat%20Willie.mp4",
+      "sourceIpfsCid": "bafybeifanztr2e2wnhpnonwbezm3p5gvxveo4uumrr2xbdsgu55uix2mga",
+      "sourceIpfsUrl": "https://ipfs.etzhayyim.com/ipfs/bafybeifanztr2e2wnhpnonwbezm3p5gvxveo4uumrr2xbdsgu55uix2mga",
+      "sourcePageUrl": "https://archive.org/details/SteamboatWillie",
+      "sourceFilename": "steamboat-willie-1928.mp4",
+      "sourceContentType": "video/mp4",
+      "sourceByteSize": 33335230,
+      "sourceSha256": "6f7c8c9309edf3357a27d27a8bb13feed44853a814b682c43ead24ca9446aa43",
+      "publishJurisdiction": "US",
+      "targetLanguages": ["ja", "en", "es", "fr", "zh-Hans", "ko"],
+      "voicePolicy": "narration-neutral",
+      "voiceLipSync": false,
+      "rightsEvidence": [
+        {
+          "kind": "archive-page",
+          "url": "https://archive.org/details/SteamboatWillie",
+          "note": "Internet Archive item page for the source file."
+        },
+        {
+          "kind": "public-domain-day",
+          "url": "https://web.law.duke.edu/cspd/publicdomainday/2024/",
+          "note": "1928 U.S. works entered the public domain on 2024-01-01, subject to trademark and derivative-version caveats."
+        }
+      ]
+    },
+    {
+      "slug": "a-trip-to-the-moon-1902",
+      "workId": "pdcolor:work:a-trip-to-the-moon-1902",
+      "title": "A Trip to the Moon",
+      "workKind": "film",
+      "year": 1902,
+      "sourceLanguage": "fr",
+      "sourceUrl": "https://archive.org/download/ATripToTheMoon1902/A%20Trip%20to%20the%20Moon%20%281902%29.ogv",
+      "sourcePageUrl": "https://archive.org/details/ATripToTheMoon1902",
+      "sourceFilename": "a-trip-to-the-moon-1902.ogv",
+      "sourceContentType": "video/ogg",
+      "sourceByteSize": 71877705,
+      "publishJurisdiction": "US",
+      "targetLanguages": ["ja", "en", "es", "fr", "zh-Hans", "ko"],
+      "voicePolicy": "narration-neutral",
+      "voiceLipSync": false,
+      "rightsEvidence": [
+        {
+          "kind": "archive-page",
+          "url": "https://archive.org/details/ATripToTheMoon1902",
+          "note": "Internet Archive item page for the source file."
+        },
+        {
+          "kind": "publication-year",
+          "value": "1902",
+          "note": "First-publication era is before the current U.S. public-domain cutoff."
+        }
+      ]
+    }
+  ]
+}

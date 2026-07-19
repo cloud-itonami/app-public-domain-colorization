@@ -1,0 +1,556 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions
+    xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+    xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    id="Definitions_public_domain_colorization_pipeline"
+    targetNamespace="https://etzhayyim.com/bpmn/public-domain-colorization"
+    exporter="hand-written"
+    exporterVersion="1.0">
+  <bpmn:process id="public_domain_colorization_pipeline" name="Public-domain colorization pipeline" isExecutable="true">
+    <bpmn:startEvent id="Start"><bpmn:outgoing>Flow_Start_IpfsIngest</bpmn:outgoing></bpmn:startEvent>
+    <bpmn:sequenceFlow id="Flow_Start_IpfsIngest" sourceRef="Start" targetRef="Task_IpfsIngestMovie"/>
+
+    <bpmn:serviceTask id="Task_IpfsIngestMovie" name="Ingest movie to IPFS">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="pdColor.ipfs.ingestMovie"/>
+        <zeebe:ioMapping>
+          <zeebe:input source="=sourceUrl" target="source_url"/>
+          <zeebe:input source="=sourceIpfsCid" target="source_ipfs_cid"/>
+          <zeebe:input source="=if sourceFilename != null then sourceFilename else workId + &quot;.movie&quot;" target="filename"/>
+          <zeebe:input source="=sourceContentType" target="content_type"/>
+          <zeebe:input source="=maxSourceBytes" target="max_bytes"/>
+          <zeebe:output source="=sourceIpfsCid" target="sourceIpfsCid"/>
+          <zeebe:output source="=sourceIpfsUrl" target="sourceIpfsUrl"/>
+          <zeebe:output source="=sourceIpfsPinned" target="sourceIpfsPinned"/>
+          <zeebe:output source="=sourceByteSize" target="sourceByteSize"/>
+          <zeebe:output source="=sourceSha256" target="sourceSha256"/>
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Start_IpfsIngest</bpmn:incoming><bpmn:outgoing>Flow_IpfsIngest_Source</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_IpfsIngest_Source" sourceRef="Task_IpfsIngestMovie" targetRef="Task_FetchSource"/>
+
+    <bpmn:serviceTask id="Task_FetchSource" name="Fetch source metadata">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="generic.xrpc.invoke"/>
+        <zeebe:ioMapping>
+          <zeebe:input source="=&quot;com.etzhayyim.apps.storage.resolveSourceAsset&quot;" target="nsid"/>
+          <zeebe:input source="={sourceUrl: sourceUrl, sourceBlobCid: sourceBlobCid, sourceIpfsCid: sourceIpfsCid, sourceIpfsUrl: sourceIpfsUrl, sourceSha256: sourceSha256, sourceByteSize: sourceByteSize, title: title, workKind: workKind, callerDid: callerDid}" target="payload"/>
+          <zeebe:output source="=response" target="sourceRecord"/>
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_IpfsIngest_Source</bpmn:incoming><bpmn:outgoing>Flow_Source_SaveSourceAsset</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_Source_SaveSourceAsset" sourceRef="Task_FetchSource" targetRef="Task_SaveSourceAsset"/>
+
+    <bpmn:serviceTask id="Task_SaveSourceAsset" name="Save source asset">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="generic.db.insert"/>
+        <zeebe:ioMapping>
+          <zeebe:input source="=&quot;vertex_pd_color_source_asset&quot;" target="table"/>
+          <zeebe:input source="={
+              vertex_id: &quot;pdcolor:source:&quot; + runVertexId,
+              work_id: workId,
+              source_url: sourceUrl,
+              source_blob_cid: sourceBlobCid,
+              source_ipfs_cid: sourceIpfsCid,
+              source_ipfs_url: sourceIpfsUrl,
+              sha256: sourceSha256,
+              media_kind: &quot;movie&quot;,
+              acquisition_note: if sourceIpfsCid != null then &quot;ipfs-import&quot; else &quot;source-url-import&quot;,
+              created_at: string(now()),
+              owner_did: callerDid,
+              actor_id: &quot;sys.bpmn.pd-color&quot;
+          }" target="values"/>
+          <zeebe:input source="=&quot;ignore&quot;" target="onConflict"/>
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Source_SaveSourceAsset</bpmn:incoming><bpmn:outgoing>Flow_SourceAsset_Rights</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_SourceAsset_Rights" sourceRef="Task_SaveSourceAsset" targetRef="Task_InspectRights"/>
+
+    <bpmn:serviceTask id="Task_InspectRights" name="Inspect rights">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="generic.xrpc.invoke"/>
+        <zeebe:ioMapping>
+          <zeebe:input source="=&quot;com.etzhayyim.apps.copyright.license.inspect&quot;" target="nsid"/>
+          <zeebe:input source="={workId: workId, title: title, workKind: workKind, publishJurisdiction: publishJurisdiction, sourceRecord: sourceRecord}" target="payload"/>
+          <zeebe:output source="=response.classification" target="rightsClassification"/>
+          <zeebe:output source="=response.evidenceCid" target="rightsEvidenceCid"/>
+          <zeebe:output source="=response.blockedReasons" target="blockedReasons"/>
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Source_Rights</bpmn:incoming><bpmn:outgoing>Flow_Rights_SaveRun</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_Rights_SaveRun" sourceRef="Task_InspectRights" targetRef="Task_SaveRun"/>
+
+    <bpmn:serviceTask id="Task_SaveRun" name="Save run candidate">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="generic.db.insert"/>
+        <zeebe:ioMapping>
+          <zeebe:input source="=&quot;vertex_pd_color_run&quot;" target="table"/>
+          <zeebe:input source="={
+              vertex_id: runVertexId,
+              work_id: workId,
+              title: title,
+              work_kind: workKind,
+              source_url: sourceUrl,
+              source_blob_cid: sourceBlobCid,
+              source_ipfs_cid: sourceIpfsCid,
+              source_ipfs_url: sourceIpfsUrl,
+              source_sha256: sourceSha256,
+              source_byte_size: sourceByteSize,
+              publish_jurisdiction: publishJurisdiction,
+              rights_classification: rightsClassification,
+              rights_evidence_cid: rightsEvidenceCid,
+              blocked_reasons_json: blockedReasons,
+              status: &quot;rights_review&quot;,
+              created_at: string(now()),
+              owner_did: callerDid,
+              actor_id: &quot;sys.bpmn.pd-color&quot;
+          }" target="values"/>
+          <zeebe:input source="=&quot;ignore&quot;" target="onConflict"/>
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Rights_SaveRun</bpmn:incoming><bpmn:outgoing>Flow_SaveRun_Gate</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_SaveRun_Gate" sourceRef="Task_SaveRun" targetRef="Gate_AutoRights"/>
+
+    <bpmn:exclusiveGateway id="Gate_AutoRights" name="Rights class publishable?" default="Flow_Rights_Blocked">
+      <bpmn:incoming>Flow_SaveRun_Gate</bpmn:incoming>
+      <bpmn:outgoing>Flow_Rights_Human</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Rights_Blocked</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="Flow_Rights_Human" sourceRef="Gate_AutoRights" targetRef="Task_HumanRightsApproval">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=rightsClassification = &quot;public-domain&quot; or rightsClassification = &quot;license-permits-colorization&quot;</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Rights_Blocked" sourceRef="Gate_AutoRights" targetRef="Task_AuditBlocked"/>
+
+    <bpmn:userTask id="Task_HumanRightsApproval" name="Human rights approval">
+      <bpmn:extensionElements>
+        <zeebe:formDefinition formKey="camunda-forms:bpmn:pd-color-rights-review-v1"/>
+        <zeebe:assignmentDefinition assignee="rights-reviewer"/>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Rights_Human</bpmn:incoming><bpmn:outgoing>Flow_Human_Gate</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="Flow_Human_Gate" sourceRef="Task_HumanRightsApproval" targetRef="Gate_HumanRights"/>
+
+    <bpmn:exclusiveGateway id="Gate_HumanRights" name="Approved?" default="Flow_Human_Blocked">
+      <bpmn:incoming>Flow_Human_Gate</bpmn:incoming>
+      <bpmn:outgoing>Flow_Human_SaveRights</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Human_Blocked</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="Flow_Human_SaveRights" sourceRef="Gate_HumanRights" targetRef="Task_SaveRightsReview">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=rightsApproved = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Human_Blocked" sourceRef="Gate_HumanRights" targetRef="Task_AuditBlocked"/>
+
+    <bpmn:serviceTask id="Task_SaveRightsReview" name="Save rights review">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="generic.db.insert"/>
+        <zeebe:ioMapping>
+          <zeebe:input source="=&quot;vertex_pd_color_rights_review&quot;" target="table"/>
+          <zeebe:input source="={
+              vertex_id: &quot;pdcolor:rights:&quot; + runVertexId,
+              work_id: workId,
+              publish_jurisdiction: publishJurisdiction,
+              rights_classification: rightsClassification,
+              rights_evidence_cid: rightsEvidenceCid,
+              blocked_reasons_json: blockedReasons,
+              reviewer_did: rightsReviewerDid,
+              rights_approved: rightsApproved = true,
+              reviewed_at: string(now()),
+              created_at: string(now()),
+              owner_did: callerDid,
+              actor_id: &quot;sys.bpmn.pd-color&quot;
+          }" target="values"/>
+          <zeebe:input source="=&quot;ignore&quot;" target="onConflict"/>
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Human_SaveRights</bpmn:incoming><bpmn:outgoing>Flow_RightsReview_Segment</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_RightsReview_Segment" sourceRef="Task_SaveRightsReview" targetRef="Task_SegmentShots"/>
+
+    <bpmn:serviceTask id="Task_SegmentShots" name="Segment shots">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="pdColor.video.segmentShots"/>
+        <zeebe:ioMapping>
+          <zeebe:input source="=sourceBlobCid" target="sourceBlobCid"/>
+          <zeebe:input source="=sourceIpfsCid" target="sourceIpfsCid"/>
+          <zeebe:input source="=sourceIpfsUrl" target="sourceIpfsUrl"/>
+          <zeebe:input source="=workId" target="workId"/>
+          <zeebe:input source="=runVertexId" target="runVertexId"/>
+          <zeebe:output source="=blobCid" target="shotMapCid"/>
+          <zeebe:output source="=meta.shotCount" target="shotCount"/>
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Human_Segment</bpmn:incoming><bpmn:outgoing>Flow_Segment_Restore</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_Segment_Restore" sourceRef="Task_SegmentShots" targetRef="Task_RestoreFrames"/>
+
+    <bpmn:serviceTask id="Task_RestoreFrames" name="Restore frames">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="pdColor.video.restoreFrames"/>
+        <zeebe:ioMapping>
+          <zeebe:input source="=sourceBlobCid" target="sourceBlobCid"/>
+          <zeebe:input source="=sourceIpfsCid" target="sourceIpfsCid"/>
+          <zeebe:input source="=shotMapCid" target="shotMapCid"/>
+          <zeebe:input source="=workKind" target="workKind"/>
+          <zeebe:input source="=runVertexId" target="runVertexId"/>
+          <zeebe:input source="=workId" target="workId"/>
+          <zeebe:input source="=if qualityProfile != null then qualityProfile else &quot;archive-hq&quot;" target="qualityProfile"/>
+          <zeebe:input source="=if targetResolution != null then targetResolution else &quot;1080p&quot;" target="targetResolution"/>
+          <zeebe:output source="=blobCid" target="restoredFramesCid"/>
+          <zeebe:output source="=meta" target="restoreMeta"/>
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Segment_Restore</bpmn:incoming><bpmn:outgoing>Flow_Restore_Colorize</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_Restore_Colorize" sourceRef="Task_RestoreFrames" targetRef="Task_ColorizeFrames"/>
+
+    <bpmn:serviceTask id="Task_ColorizeFrames" name="Colorize frames">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="pdColor.video.colorizeFrames"/>
+        <zeebe:ioMapping>
+          <zeebe:input source="=restoredFramesCid" target="restoredFramesCid"/>
+          <zeebe:input source="=shotMapCid" target="shotMapCid"/>
+          <zeebe:input source="=title" target="title"/>
+          <zeebe:input source="=paletteReferenceCid" target="paletteReferenceCid"/>
+          <zeebe:input source="=runVertexId" target="runVertexId"/>
+          <zeebe:input source="=workId" target="workId"/>
+          <zeebe:input source="=if qualityProfile != null then qualityProfile else &quot;archive-hq&quot;" target="qualityProfile"/>
+          <zeebe:output source="=blobCid" target="colorizedFramesCid"/>
+          <zeebe:output source="=meta" target="colorizeMeta"/>
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Restore_Colorize</bpmn:incoming><bpmn:outgoing>Flow_Colorize_Enhance</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_Colorize_Enhance" sourceRef="Task_ColorizeFrames" targetRef="Task_EnhanceQuality"/>
+
+    <bpmn:serviceTask id="Task_EnhanceQuality" name="Enhance quality">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="pdColor.video.enhanceQuality"/>
+        <zeebe:ioMapping>
+          <zeebe:input source="=colorizedFramesCid" target="colorizedFramesCid"/>
+          <zeebe:input source="=shotMapCid" target="shotMapCid"/>
+          <zeebe:input source="=runVertexId" target="runVertexId"/>
+          <zeebe:input source="=workId" target="workId"/>
+          <zeebe:input source="=if qualityProfile != null then qualityProfile else &quot;archive-hq&quot;" target="qualityProfile"/>
+          <zeebe:input source="=if targetResolution != null then targetResolution else &quot;1080p&quot;" target="targetResolution"/>
+          <zeebe:input source="=if grainPreservation != null then grainPreservation else true" target="grainPreservation"/>
+          <zeebe:output source="=blobCid" target="colorizedFramesCid"/>
+          <zeebe:output source="=meta" target="qualityMeta"/>
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Colorize_Enhance</bpmn:incoming><bpmn:outgoing>Flow_Enhance_Qc</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_Enhance_Qc" sourceRef="Task_EnhanceQuality" targetRef="Task_QcReview"/>
+
+    <bpmn:userTask id="Task_QcReview" name="Colorization QC">
+      <bpmn:extensionElements>
+        <zeebe:formDefinition formKey="camunda-forms:bpmn:pd-color-qc-review-v1"/>
+        <zeebe:assignmentDefinition assignee="media-qc"/>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Enhance_Qc</bpmn:incoming><bpmn:outgoing>Flow_Qc_Gate</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="Flow_Qc_Gate" sourceRef="Task_QcReview" targetRef="Gate_Qc"/>
+
+    <bpmn:exclusiveGateway id="Gate_Qc" name="QC approved?" default="Flow_Qc_Rework">
+      <bpmn:incoming>Flow_Qc_Gate</bpmn:incoming>
+      <bpmn:outgoing>Flow_Qc_Encode</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Qc_Rework</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="Flow_Qc_Encode" sourceRef="Gate_Qc" targetRef="Task_EncodePackage">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=qcApproved = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Qc_Rework" sourceRef="Gate_Qc" targetRef="Task_AuditRework"/>
+
+    <bpmn:serviceTask id="Task_EncodePackage" name="Encode package">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="pdColor.video.encodePackage"/>
+        <zeebe:ioMapping>
+          <zeebe:input source="=colorizedFramesCid" target="colorizedFramesCid"/>
+          <zeebe:input source="=sourceRecord" target="sourceRecord"/>
+          <zeebe:input source="=rightsEvidenceCid" target="rightsEvidenceCid"/>
+          <zeebe:input source="=requestedLicense" target="requestedLicense"/>
+          <zeebe:input source="=runVertexId" target="runVertexId"/>
+          <zeebe:input source="=workId" target="workId"/>
+          <zeebe:input source="=if qualityProfile != null then qualityProfile else &quot;archive-hq&quot;" target="qualityProfile"/>
+          <zeebe:input source="=if targetResolution != null then targetResolution else &quot;1080p&quot;" target="targetResolution"/>
+          <zeebe:output source="=blobCid" target="masterVideoCid"/>
+          <zeebe:output source="=meta.posterCid" target="posterCid"/>
+          <zeebe:output source="=meta.manifestCid" target="publicationManifestCid"/>
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Qc_Encode</bpmn:incoming><bpmn:outgoing>Flow_Encode_TimedText</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_Encode_TimedText" sourceRef="Task_EncodePackage" targetRef="Task_ExtractTimedText"/>
+
+    <bpmn:serviceTask id="Task_ExtractTimedText" name="Extract timed text">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="pdColor.audio.extractTimedText"/>
+        <zeebe:ioMapping>
+          <zeebe:input source="=masterVideoCid" target="masterVideoCid"/>
+          <zeebe:input source="=sourceLanguage" target="sourceLanguage"/>
+          <zeebe:input source="=workKind" target="workKind"/>
+          <zeebe:input source="=runVertexId" target="runVertexId"/>
+          <zeebe:input source="=workId" target="workId"/>
+          <zeebe:input source="=true" target="preserveIntertitles"/>
+          <zeebe:output source="=blobCid" target="timedTextCid"/>
+          <zeebe:output source="=meta.segmentCount" target="timedTextSegmentCount"/>
+          <zeebe:output source="=meta.detectedLanguage" target="detectedLanguage"/>
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Encode_TimedText</bpmn:incoming><bpmn:outgoing>Flow_TimedText_Translate</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_TimedText_Translate" sourceRef="Task_ExtractTimedText" targetRef="Task_TranslateTimedText"/>
+
+    <bpmn:serviceTask id="Task_TranslateTimedText" name="Translate subtitles">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="pdColor.localization.translateSubtitles"/>
+        <zeebe:ioMapping>
+          <zeebe:input source="=timedTextCid" target="timedTextCid"/>
+          <zeebe:input source="=sourceLanguage" target="sourceLanguage"/>
+          <zeebe:input source="=detectedLanguage" target="detectedLanguage"/>
+          <zeebe:input source="=targetLanguages" target="targetLanguages"/>
+          <zeebe:input source="=glossaryCid" target="glossaryCid"/>
+          <zeebe:input source="=title" target="title"/>
+          <zeebe:input source="=workKind" target="workKind"/>
+          <zeebe:input source="=rightsEvidenceCid" target="rightsEvidenceCid"/>
+          <zeebe:input source="=runVertexId" target="runVertexId"/>
+          <zeebe:input source="=workId" target="workId"/>
+          <zeebe:output source="=response.manifestCid" target="subtitleManifestCid"/>
+          <zeebe:output source="=response.translatedCount" target="subtitleTranslatedCount"/>
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_TimedText_Translate</bpmn:incoming><bpmn:outgoing>Flow_Translate_Dub</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_Translate_Dub" sourceRef="Task_TranslateTimedText" targetRef="Task_GenerateDubbedAudio"/>
+
+    <bpmn:serviceTask id="Task_GenerateDubbedAudio" name="Generate dubbed audio">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="pdColor.audio.generateDubbedAudio"/>
+        <zeebe:ioMapping>
+          <zeebe:input source="=masterVideoCid" target="masterVideoCid"/>
+          <zeebe:input source="=timedTextCid" target="timedTextCid"/>
+          <zeebe:input source="=subtitleManifestCid" target="subtitleManifestCid"/>
+          <zeebe:input source="=targetLanguages" target="targetLanguages"/>
+          <zeebe:input source="=voicePolicy" target="voicePolicy"/>
+          <zeebe:input source="=voiceLipSync = true" target="voiceLipSync"/>
+          <zeebe:input source="=runVertexId" target="runVertexId"/>
+          <zeebe:input source="=workId" target="workId"/>
+          <zeebe:output source="=blobCid" target="dubbedAudioManifestCid"/>
+          <zeebe:output source="=meta.generatedCount" target="dubbedAudioCount"/>
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Translate_Dub</bpmn:incoming><bpmn:outgoing>Flow_Dub_Mux</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_Dub_Mux" sourceRef="Task_GenerateDubbedAudio" targetRef="Task_MuxLocalizedPackages"/>
+
+    <bpmn:serviceTask id="Task_MuxLocalizedPackages" name="Mux localized packages">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="pdColor.video.muxLocalizedPackages"/>
+        <zeebe:ioMapping>
+          <zeebe:input source="=masterVideoCid" target="masterVideoCid"/>
+          <zeebe:input source="=publicationManifestCid" target="publicationManifestCid"/>
+          <zeebe:input source="=subtitleManifestCid" target="subtitleManifestCid"/>
+          <zeebe:input source="=dubbedAudioManifestCid" target="dubbedAudioManifestCid"/>
+          <zeebe:input source="=targetLanguages" target="targetLanguages"/>
+          <zeebe:input source="=runVertexId" target="runVertexId"/>
+          <zeebe:input source="=workId" target="workId"/>
+          <zeebe:output source="=blobCid" target="localizedPackageManifestCid"/>
+          <zeebe:output source="=meta.packageCount" target="localizedPackageCount"/>
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Dub_Mux</bpmn:incoming><bpmn:outgoing>Flow_Localized_SaveDerivatives</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_Localized_SaveDerivatives" sourceRef="Task_MuxLocalizedPackages" targetRef="Task_SaveDerivatives"/>
+
+    <bpmn:serviceTask id="Task_SaveDerivatives" name="Save derivative assets">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="generic.db.insert"/>
+        <zeebe:ioMapping>
+          <zeebe:input source="=&quot;vertex_pd_color_derivative_asset&quot;" target="table"/>
+          <zeebe:input source="={
+              vertex_id: derivativeVertexId,
+              run_vertex_id: runVertexId,
+              work_id: workId,
+              master_video_cid: masterVideoCid,
+              poster_cid: posterCid,
+              publication_manifest_cid: publicationManifestCid,
+              timed_text_cid: timedTextCid,
+              subtitle_manifest_cid: subtitleManifestCid,
+              dubbed_audio_manifest_cid: dubbedAudioManifestCid,
+              localized_package_manifest_cid: localizedPackageManifestCid,
+              target_languages_json: targetLanguages,
+              rights_evidence_cid: rightsEvidenceCid,
+              status: if dryRun = true then &quot;dry_run_ready&quot; else &quot;ready_to_publish&quot;,
+              created_at: string(now()),
+              owner_did: callerDid,
+              actor_id: &quot;sys.bpmn.pd-color&quot;
+          }" target="values"/>
+          <zeebe:input source="=&quot;ignore&quot;" target="onConflict"/>
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Localized_SaveDerivatives</bpmn:incoming><bpmn:outgoing>Flow_SaveDerivatives_SaveLocalization</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_SaveDerivatives_SaveLocalization" sourceRef="Task_SaveDerivatives" targetRef="Task_SaveLocalizationAssets"/>
+
+    <bpmn:serviceTask id="Task_SaveLocalizationAssets" name="Save localization assets">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="generic.db.bulkInsert"/>
+        <zeebe:ioMapping>
+          <zeebe:input source="=&quot;vertex_pd_color_localization_asset&quot;" target="table"/>
+          <zeebe:input source="=for lang in targetLanguages return {
+              vertex_id: &quot;pdcolor:localization:&quot; + derivativeVertexId + &quot;:&quot; + lang,
+              derivative_vertex_id: derivativeVertexId,
+              work_id: workId,
+              lang: lang,
+              subtitle_cid: subtitleManifestCid,
+              dubbed_audio_cid: dubbedAudioManifestCid,
+              localized_video_cid: localizedPackageManifestCid,
+              voice_policy: voicePolicy,
+              writing_direction: if lang = &quot;ar&quot; or lang = &quot;he&quot; then &quot;rtl&quot; else &quot;ltr&quot;,
+              quality_score: 0.0,
+              manifest_cid: localizedPackageManifestCid,
+              created_at: string(now()),
+              owner_did: callerDid,
+              actor_id: &quot;sys.bpmn.pd-color&quot;
+          }" target="rows"/>
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_SaveDerivatives_SaveLocalization</bpmn:incoming><bpmn:outgoing>Flow_SaveLocalization_PublishGate</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_SaveLocalization_PublishGate" sourceRef="Task_SaveLocalizationAssets" targetRef="Gate_DryRun"/>
+
+    <bpmn:exclusiveGateway id="Gate_DryRun" name="Dry run?" default="Flow_DoPublish">
+      <bpmn:incoming>Flow_SaveLocalization_PublishGate</bpmn:incoming>
+      <bpmn:outgoing>Flow_DryRunAudit</bpmn:outgoing>
+      <bpmn:outgoing>Flow_DoPublish</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="Flow_DryRunAudit" sourceRef="Gate_DryRun" targetRef="Task_AuditDryRun">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=dryRun = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_DoPublish" sourceRef="Gate_DryRun" targetRef="Task_Publish"/>
+
+    <bpmn:serviceTask id="Task_Publish" name="Publish record">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="generic.pds.dispatch"/>
+        <zeebe:ioMapping>
+          <zeebe:input source="=&quot;com.atproto.repo.createRecord&quot;" target="type"/>
+          <zeebe:input source="={
+              repo: callerDid,
+              collection: &quot;com.etzhayyim.apps.publicDomainColorization.publication&quot;,
+              record: {
+                $type: &quot;com.etzhayyim.apps.publicDomainColorization.publication&quot;,
+                workId: workId,
+                title: title,
+                workKind: workKind,
+                publishJurisdiction: publishJurisdiction,
+                masterVideoCid: masterVideoCid,
+                posterCid: posterCid,
+                publicationManifestCid: publicationManifestCid,
+                subtitleManifestCid: subtitleManifestCid,
+                dubbedAudioManifestCid: dubbedAudioManifestCid,
+                localizedPackageManifestCid: localizedPackageManifestCid,
+                targetLanguages: targetLanguages,
+                rightsEvidenceCid: rightsEvidenceCid,
+                sourceUrl: sourceUrl,
+                createdAt: string(now())
+              }
+          }" target="payload"/>
+          <zeebe:output source="=cid" target="publicationCid"/>
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_DoPublish</bpmn:incoming><bpmn:outgoing>Flow_Publish_SavePublication</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_Publish_SavePublication" sourceRef="Task_Publish" targetRef="Task_SavePublication"/>
+
+    <bpmn:serviceTask id="Task_SavePublication" name="Save publication">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="generic.db.insert"/>
+        <zeebe:ioMapping>
+          <zeebe:input source="=&quot;vertex_pd_color_publication&quot;" target="table"/>
+          <zeebe:input source="={
+              vertex_id: &quot;pdcolor:publication:&quot; + derivativeVertexId,
+              derivative_vertex_id: derivativeVertexId,
+              work_id: workId,
+              publication_cid: publicationCid,
+              publish_jurisdiction: publishJurisdiction,
+              publication_manifest_cid: publicationManifestCid,
+              localized_package_manifest_cid: localizedPackageManifestCid,
+              rights_evidence_cid: rightsEvidenceCid,
+              status: &quot;published&quot;,
+              published_at: string(now()),
+              created_at: string(now()),
+              owner_did: callerDid,
+              actor_id: &quot;sys.bpmn.pd-color&quot;
+          }" target="values"/>
+          <zeebe:input source="=&quot;ignore&quot;" target="onConflict"/>
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Publish_SavePublication</bpmn:incoming><bpmn:outgoing>Flow_SavePublication_Audit</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_SavePublication_Audit" sourceRef="Task_SavePublication" targetRef="Task_AuditPublished"/>
+
+    <bpmn:serviceTask id="Task_AuditPublished" name="audit published">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="generic.audit.emit"/>
+        <zeebe:ioMapping>
+          <zeebe:input source="=&quot;did:web:pd-color.etzhayyim.com&quot;" target="actor"/>
+          <zeebe:input source="=&quot;pdColor.publish&quot;" target="action"/>
+          <zeebe:input source="={runVertexId: runVertexId, workId: workId, publicationCid: publicationCid, masterVideoCid: masterVideoCid, localizedPackageManifestCid: localizedPackageManifestCid, targetLanguages: targetLanguages, rightsEvidenceCid: rightsEvidenceCid}" target="payload"/>
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_SavePublication_Audit</bpmn:incoming><bpmn:outgoing>Flow_EndPublished</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_EndPublished" sourceRef="Task_AuditPublished" targetRef="End_Published"/>
+
+    <bpmn:serviceTask id="Task_AuditDryRun" name="audit dry run">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="generic.audit.emit"/>
+        <zeebe:ioMapping>
+          <zeebe:input source="=&quot;did:web:pd-color.etzhayyim.com&quot;" target="actor"/>
+          <zeebe:input source="=&quot;pdColor.dryRunReady&quot;" target="action"/>
+          <zeebe:input source="={runVertexId: runVertexId, workId: workId, masterVideoCid: masterVideoCid, localizedPackageManifestCid: localizedPackageManifestCid, targetLanguages: targetLanguages, rightsEvidenceCid: rightsEvidenceCid}" target="payload"/>
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_DryRunAudit</bpmn:incoming><bpmn:outgoing>Flow_EndDryRun</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_EndDryRun" sourceRef="Task_AuditDryRun" targetRef="End_DryRun"/>
+
+    <bpmn:serviceTask id="Task_AuditRework" name="audit rework">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="generic.audit.emit"/>
+        <zeebe:ioMapping>
+          <zeebe:input source="=&quot;did:web:pd-color.etzhayyim.com&quot;" target="actor"/>
+          <zeebe:input source="=&quot;pdColor.reworkRequested&quot;" target="action"/>
+          <zeebe:input source="={runVertexId: runVertexId, workId: workId, qcNotes: qcNotes}" target="payload"/>
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Qc_Rework</bpmn:incoming><bpmn:outgoing>Flow_EndRework</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_EndRework" sourceRef="Task_AuditRework" targetRef="End_Rework"/>
+
+    <bpmn:serviceTask id="Task_AuditBlocked" name="audit blocked">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="generic.audit.emit"/>
+        <zeebe:ioMapping>
+          <zeebe:input source="=&quot;did:web:pd-color.etzhayyim.com&quot;" target="actor"/>
+          <zeebe:input source="=&quot;pdColor.blocked&quot;" target="action"/>
+          <zeebe:input source="={runVertexId: runVertexId, workId: workId, rightsClassification: rightsClassification, blockedReasons: blockedReasons, rightsEvidenceCid: rightsEvidenceCid}" target="payload"/>
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Rights_Blocked</bpmn:incoming>
+      <bpmn:incoming>Flow_Human_Blocked</bpmn:incoming>
+      <bpmn:outgoing>Flow_EndBlocked</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_EndBlocked" sourceRef="Task_AuditBlocked" targetRef="End_Blocked"/>
+
+    <bpmn:endEvent id="End_Published"><bpmn:incoming>Flow_EndPublished</bpmn:incoming></bpmn:endEvent>
+    <bpmn:endEvent id="End_DryRun"><bpmn:incoming>Flow_EndDryRun</bpmn:incoming></bpmn:endEvent>
+    <bpmn:endEvent id="End_Rework"><bpmn:incoming>Flow_EndRework</bpmn:incoming></bpmn:endEvent>
+    <bpmn:endEvent id="End_Blocked"><bpmn:incoming>Flow_EndBlocked</bpmn:incoming></bpmn:endEvent>
+  </bpmn:process>
+</bpmn:definitions>
