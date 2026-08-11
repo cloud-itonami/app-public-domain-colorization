@@ -1,1 +1,5 @@
-{:schema "etzhayyim.repository/v1" :name "com-etzhayyim-app-public-domain-colorization" :kind :app :canonical-metadata :edn}
+{:schema "etzhayyim.repository/v1"
+ :name "app-public-domain-colorization"
+ :kind :app
+ :canonical-metadata :edn
+ :boundary {:role :public-domain-restoration-publication-application}}
