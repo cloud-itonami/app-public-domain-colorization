@@ -1,0 +1,206 @@
+(ns lg-pd-color.contract-test
+  "Contracts this repo states in one artifact and relies on in another.
+
+  `smoke_test` covers the dispatch surface against itself: the registry equals a
+  literal written next to it, so renaming a graph in both places at once stays
+  green. The three things below cannot be kept true by editing one file.
+
+  1. The BPMN process dispatches Zeebe task types (`pdColor.video.segmentShots`)
+     and this server serves graphs (`videoSegmentShots`). Nothing checked that
+     the two agree. Rename a graph without touching the BPMN and the process
+     keeps dispatching a task type nobody serves — the run does not fail here,
+     it stalls in the broker.
+
+  2. The gate this whole repo exists for is `Gate_AutoRights` / `Gate_HumanRights`
+     / `Gate_Qc`. Their safety property is not that the conditions are right; it
+     is that a run which answers NOTHING refuses. That lives in the gateways'
+     `default` attribute, one XML attribute per gate, and no test read it.
+
+  3. nbb and the JVM are configured from two different files, so the two halves
+     of `run_tests.cljs` can silently test two different library versions.
+
+  Reading XML with regular expressions is not a general-purpose parser, and this
+  is not one: it pulls named attributes off a committed, well-formed file. The
+  risk that matters is the extraction quietly matching nothing and reporting a
+  contract as satisfied, so every derived collection is asserted non-empty
+  before anything is claimed about its contents, and the reachability test
+  carries a positive control."
+  (:require [clojure.test :refer [deftest is testing]]
+            [clojure.string :as str]
+            [lg-pd-color.server :as server]
+            #?(:cljs ["node:fs" :as fs])))
+
+;; ── reading the committed artifacts ─────────────────────────────────────────
+
+(defn- read-text
+  "Both runtimes. `slurp` does not exist under nbb and `node:fs` does not exist
+  on the JVM, so this is the one place the two diverge."
+  [path]
+  #?(:clj  (slurp path)
+     :cljs (.readFileSync fs path "utf8")))
+
+(def ^:private bpmn-path "../bpmn/colorize-public-domain-work.bpmn")
+
+(def ^:private bpmn (delay (read-text bpmn-path)))
+
+(defn- attr
+  "The value of attribute `k` on an opening tag, or nil."
+  [tag k]
+  (second (re-find (re-pattern (str "\\b" k "=\"([^\"]*)\"")) tag)))
+
+(defn- open-tags
+  "Every opening tag of `bpmn:<tag>` in the document, as raw strings.
+
+  No capture group, so `re-seq` yields the matched strings themselves. An
+  earlier version mapped `first` over them — which takes the first CHARACTER of
+  each tag, and every attribute lookup downstream then answered nil. The floor
+  assertions in the first deftest are what reported it."
+  [xml tag]
+  (re-seq (re-pattern (str "<bpmn:" tag "\\b[^>]*>")) xml))
+
+(def ^:private task-types
+  "Every Zeebe task type the process dispatches."
+  (delay (set (map second (re-seq #"<zeebe:taskDefinition\s+type=\"([^\"]+)\"" @bpmn)))))
+
+(def ^:private flows
+  "sequence-flow id -> {:from :to}."
+  (delay (into {} (for [t (open-tags @bpmn "sequenceFlow")]
+                    [(attr t "id") {:from (attr t "sourceRef") :to (attr t "targetRef")}]))))
+
+(def ^:private gateway-defaults
+  "gateway id -> the sequence flow taken when no condition answers."
+  (delay (into {} (for [t (open-tags @bpmn "exclusiveGateway")]
+                    [(attr t "id") (attr t "default")]))))
+
+(defn- default-target
+  "Where gateway `gw` goes when nothing answers."
+  [gw]
+  (:to (get @flows (get @gateway-defaults gw))))
+
+;; ── 0. the extraction answered at all ───────────────────────────────────────
+
+(deftest the-bpmn-was-read-before-anything-is-claimed-about-it
+  (testing "run from the wrong directory this must fail, not pass vacuously"
+    (is (str/includes? @bpmn "public_domain_colorization_pipeline")
+        (str bpmn-path " is not the colorization process")))
+  (testing "and the extraction found the elements it goes on to reason about"
+    (is (<= 30 (count @flows)) "no sequence flows extracted — the reader broke, not the process")
+    (is (<= 4 (count @gateway-defaults)) "no gateways extracted")
+    (is (<= 10 (count @task-types)) "no Zeebe task types extracted")))
+
+;; ── 1. BPMN task types vs the graphs this server serves ─────────────────────
+
+(defn- capitalize-first
+  "`segmentShots` -> `SegmentShots`. NOT `str/capitalize`, which lower-cases the
+  rest and would turn `segmentShots` into `Segmentshots`."
+  [s]
+  (str (str/upper-case (subs s 0 1)) (subs s 1)))
+
+(defn graph-name-of-task-type
+  "`pdColor.video.segmentShots` -> `videoSegmentShots`: drop the `pdColor`
+  prefix, then camel-join what is left."
+  [task-type]
+  (let [[_ head & tail] (str/split task-type #"\.")]
+    (str head (str/join "" (map capitalize-first tail)))))
+
+(def served-by-another-actor
+  "The one `pdColor.*` task type this LangServer does not serve, and why.
+
+  `did:web:ipfs.etzhayyim.com` is a separate actor in the README's actor-boundary
+  table; it adds the reel and hands back a CID, and this port never touches the
+  bytes. Asserting the set EXACTLY means the entry has to be removed the day a
+  graph appears for it, rather than quietly covering a real gap."
+  #{"pdColor.ipfs.ingestMovie"})
+
+(deftest every-pdcolor-task-type-is-served-by-a-graph-or-named-as-someone-elses
+  (let [pd (set (filter #(str/starts-with? % "pdColor.") @task-types))
+        unserved (set (remove #(contains? server/GRAPHS (graph-name-of-task-type %)) pd))]
+    (is (seq pd) "the process dispatches no pdColor task type at all")
+    (is (= served-by-another-actor unserved)
+        (str "BPMN task types with no graph here: " (pr-str unserved)
+             " — expected exactly " (pr-str served-by-another-actor)))))
+
+(deftest the-derivation-is-not-vacuous
+  (testing "a rule that mapped everything to nothing would satisfy the test above"
+    (is (= "videoSegmentShots" (graph-name-of-task-type "pdColor.video.segmentShots")))
+    (is (= "localizationTranslateSubtitles"
+           (graph-name-of-task-type "pdColor.localization.translateSubtitles")))
+    (is (= "audioExtractTimedText" (graph-name-of-task-type "pdColor.audio.extractTimedText")))))
+
+(deftest every-nsid-is-its-graph-name-under-one-prefix
+  (testing "structural, so a graph added without its NSID is caught even if the literal map in smoke_test is updated"
+    (is (seq server/NSID-MAP))
+    (doseq [[nsid gname] server/NSID-MAP]
+      (is (= (str "com.etzhayyim.apps.pdColor." gname) nsid)
+          (str nsid " does not name its graph " gname)))))
+
+;; ── 2. the rights gate refuses when nothing answers ─────────────────────────
+
+(def refusing-defaults
+  "The gates whose unanswered branch must be the refusing one. Publishing a work
+  that is still in copyright is the harm this repo is built to avoid, so a run
+  that supplies no `rightsClassification`, no `rightsApproved` or no `qcApproved`
+  must land in the audit/blocked path — never fall through to the next step."
+  {"Gate_AutoRights"  "Task_AuditBlocked"
+   "Gate_HumanRights" "Task_AuditBlocked"
+   "Gate_Qc"          "Task_AuditRework"})
+
+(deftest a-gate-nobody-answers-refuses
+  (doseq [[gw expected] refusing-defaults]
+    (is (some? (get @gateway-defaults gw))
+        (str gw " declares no default flow"))
+    (is (= expected (default-target gw))
+        (str gw " falls through to " (pr-str (default-target gw))
+             " when nothing answers, not to " expected))))
+
+(deftest the-only-gate-that-defaults-to-publishing-is-the-dry-run-gate
+  (testing "Gate_DryRun's permissive default is correct — but only because it sits after the three above"
+    (is (= "Task_Publish" (default-target "Gate_DryRun")))
+    (is (= #{"Gate_DryRun"}
+           (set (for [[gw _] @gateway-defaults
+                      :when (= "Task_Publish" (default-target gw))]
+                  gw)))
+        "a second gateway now publishes when nothing answers")))
+
+(defn- successors [node]
+  (for [[_ f] @flows :when (= node (:from f))] (:to f)))
+
+(defn- reachable?
+  "Can `goal` be reached from `start` with `removed` nodes deleted from the graph?"
+  [removed start goal]
+  (loop [seen #{} frontier [start]]
+    (if (empty? frontier)
+      false
+      (let [n (first frontier)
+            rest* (vec (rest frontier))]
+        (cond
+          (= n goal) true
+          (or (seen n) (contains? removed n)) (recur seen rest*)
+          :else (recur (conj seen n) (into rest* (successors n))))))))
+
+(deftest publish-is-behind-every-rights-and-qc-gate
+  (testing "positive control — without this a broken reachability check passes the whole test below"
+    (is (reachable? #{} "Start" "Task_Publish"))
+    (is (reachable? #{} "Start" "Task_AuditBlocked") "the refusing path is not reachable either — the graph did not load"))
+  (doseq [gw ["Gate_AutoRights" "Gate_HumanRights" "Gate_Qc"]]
+    (is (not (reachable? #{gw} "Start" "Task_Publish"))
+        (str "Task_Publish is reachable on a path that never passes " gw))))
+
+(deftest refusal-ends-the-process
+  (testing "blocked runs must terminate, not rejoin the pipeline"
+    (is (= "End_Blocked" (:to (first (for [[_ f] @flows :when (= "Task_AuditBlocked" (:from f))] f)))))
+    (is (= 1 (count (for [[_ f] @flows :when (= "Task_AuditBlocked" (:from f))] f)))
+        "Task_AuditBlocked has more than one outgoing flow")))
+
+;; ── 3. the two runtimes are configured from the same pin ────────────────────
+
+(defn- langgraph-sha [text]
+  (second (re-find #"io\.github\.kotoba-lang/langgraph\s*\{:git/sha\s+\"([0-9a-f]{40})\"\}" text)))
+
+(deftest nbb-and-the-jvm-test-the-same-langgraph
+  (testing "`run_tests.cljs` claims both runtimes are green; two config files can drift to two libraries"
+    (let [d (langgraph-sha (read-text "deps.edn"))
+          n (langgraph-sha (read-text "nbb.edn"))]
+      (is (some? d) "deps.edn pins no langgraph sha in the expected shape")
+      (is (some? n) "nbb.edn pins no langgraph sha in the expected shape")
+      (is (= d n) (str "deps.edn pins " d " and nbb.edn pins " n)))))

@@ -1,0 +1,6 @@
+;; The nbb half of the same project. nbb does not read deps.edn, so the paths
+;; and the one git dependency are repeated here; the sha is the same one
+;; deps.edn pins, and `contract-test` fails if the two ever drift apart.
+{:paths ["src" "test"]
+ :deps {io.github.kotoba-lang/langgraph
+        {:git/sha "5fdc6e7d71d95bc78db4fa1a20c325c79940f984"}}}

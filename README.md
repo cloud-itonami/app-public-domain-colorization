@@ -256,6 +256,58 @@ Current canary publication:
 - Subtitle manifest CID: `bafkreigoyykv7ckdivx463qtjw4nldd43rrwkwa5iad5deatzxh7xffvle`
 - Dubbed audio manifest CID: `bafkreih6vpbhmtesxw6cibm74flkmzz6q54g6drbxwmpjy2765moekqp3y`
 
+## Running the tests
+
+```sh
+nbb run_tests.cljs
+```
+
+The suite runs on **both** runtimes and prints its green marker only when both
+pass. nbb is first (this workspace's script host); the JVM follows as the
+compatibility oracle:
+
+```
+lg-pd-color: both runtimes green (nbb + JVM)
+```
+
+The Clojure port under `lg-clj/` is configured by `lg-clj/nbb.edn` (nbb) and
+`lg-clj/deps.edn` (`clojure -M:test`), both pinning the same
+`kotoba-lang/langgraph` revision. `lg-clj/run_tests.cljs` is the runner;
+the file at the repo root is a launcher that runs it from `lg-clj/`.
+
+Until 2026-08-30 the only declared runner was a `bb.edn`, and the only runtime
+that had ever executed these `.cljc` namespaces was `bb`. They were not
+portable: `graphs/task.cljc` caught `Exception` and called `.getMessage`, so on
+nbb `lg-pd-color.graphs.task` could not be read at all
+(`Unable to resolve symbol: Exception`). Nothing reported it, because nothing
+ran it. The catch is now a reader conditional and the message is read with
+`ex-message`.
+
+### What the contract tests pin
+
+`lg-clj/test/lg_pd_color/contract_test.cljc` checks three things that cannot be
+kept true by editing one file:
+
+- **BPMN task types vs. served graphs.** The process dispatches
+  `pdColor.video.segmentShots`; this server serves `videoSegmentShots`. Rename a
+  graph without touching `bpmn/colorize-public-domain-work.bpmn` and the process
+  keeps dispatching a task type nobody serves — the run does not fail here, it
+  stalls in the broker.
+- **The rights gate refuses when nothing answers.** `Gate_AutoRights`,
+  `Gate_HumanRights` and `Gate_Qc` each carry a `default` flow, and that one XML
+  attribute — not the conditions — is what makes an unanswered run land in
+  `End_Blocked` / `End_Rework`. The tests also check that `Task_Publish` becomes
+  unreachable when any one of the three gates is removed, so no future edit can
+  route around them.
+- **Both runtimes test the same library.** `nbb.edn` and `deps.edn` are separate
+  files and can drift to two langgraph revisions, which would weaken the
+  "both green" claim without changing it.
+
+`pdColor.ipfs.ingestMovie` is the one `pdColor.*` task type in the BPMN with no
+graph here: `did:web:ipfs.etzhayyim.com` adds the reel and returns a CID, and
+this port never touches the bytes. The test asserts that exception set
+*exactly*, so it has to be removed the day a graph appears for it.
+
 ## References
 
 - Japan Agency for Cultural Affairs: https://www.bunka.go.jp/seisaku/chosakuken/taisetsu/point
