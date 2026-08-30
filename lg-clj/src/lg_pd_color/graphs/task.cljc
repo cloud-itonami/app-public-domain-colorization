@@ -27,6 +27,15 @@
 
 (defn- clip [s n] (let [s (str s)] (subs s 0 (min n (count s)))))
 
+(defn- error-message
+  "The message of a thrown value, on either runtime. `.getMessage` is JVM-only
+  interop and this namespace is `.cljc`; `ex-message` is the portable spelling
+  and reads `.message` off a JS Error. It answers nil for a Throwable that
+  carries no message and for a non-Error value thrown on cljs, so fall back to
+  the printed value rather than letting the envelope carry an empty string."
+  [e]
+  (or (ex-message e) (str e)))
+
 (defn boundary-handler
   "Default handler for task `name`: the native worker is not bound. Raises a
   clear boundary error (the actor-swap seam — inject a real fn via `*handlers*`)."
@@ -65,8 +74,8 @@
           kwargs  (or (:input state) {})]
       (try
         {:result (handler kwargs)}
-        (catch Exception e
-          {:error (clip (.getMessage e) 300)})))))
+        (catch #?(:clj Exception :cljs :default) e
+          {:error (clip (error-message e) 300)})))))
 
 (defn build
   "Compile a single-node task StateGraph for `name` (START → execute → END)."

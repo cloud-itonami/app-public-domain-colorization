@@ -1,0 +1,26 @@
+;; lg-pd-color — the portable Clojure port of the Python LangGraph server
+;; (ADR-2606280030), scoped to this sub-project (it does NOT touch the repo root).
+;;
+;;   src   — lg-pd-color.* namespaces (graphs + server + dispatch)
+;;   test  — lg-pd-color.smoke-test, lg-pd-color.contract-test
+;;
+;; The suite runs on BOTH runtimes and the runner is `run_tests.cljs`:
+;;
+;;   nbb run_tests.cljs      nbb first (the workspace's script host), JVM after
+;;   clojure -M:test         the JVM half on its own
+;;
+;; The dependency is `kotoba-lang/langgraph`, which is where this workspace
+;; registers the library (west path orgs/kotoba-lang/langgraph). The `bb.edn`
+;; this file replaces named `com-junkawasaki/langgraph-clj` — the pre-rename
+;; coordinate, from before the no-`-clj`-suffix rule — and declared `bb` as the
+;; only way to run the suite, which is the script host this workspace retired.
+;; The sha below is langgraph's default-branch tip, so the pin is reachable.
+{:paths ["src"]
+ :deps {io.github.kotoba-lang/langgraph
+        {:git/sha "5fdc6e7d71d95bc78db4fa1a20c325c79940f984"}}
+ :aliases
+ {:test {:extra-paths ["test"]
+         :extra-deps {io.github.cognitect-labs/test-runner
+                      {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
+         :main-opts ["-m" "cognitect.test-runner"]
+         :exec-fn cognitect.test-runner.api/test}}}

@@ -1,0 +1,5 @@
+# Resolved-dependency caches. `lg-clj/deps.edn` and `lg-clj/nbb.edn` are the
+# source of truth for what gets resolved; these directories are what the two
+# runtimes write while resolving it.
+.cpcache/
+.nbb/

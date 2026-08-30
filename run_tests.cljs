@@ -1,0 +1,18 @@
+#!/usr/bin/env nbb
+;; run_tests.cljs — the repo's test entry point.
+;;
+;; The Clojure port lives under `lg-clj/`, which is where its `nbb.edn` and
+;; `deps.edn` are, and both runtimes resolve those relative to the working
+;; directory. So this launcher does one thing: run the suite from there and
+;; relay its exit code. The green marker below is the child's — printed only
+;; when nbb AND the JVM are both green (see lg-clj/run_tests.cljs).
+;;
+;;   nbb run_tests.cljs
+(ns run-tests
+  (:require ["node:child_process" :as cp]))
+
+(def r (cp/spawnSync "nbb" #js ["run_tests.cljs"]
+                     #js {:cwd "lg-clj" :encoding "utf8" :shell false
+                          :stdio "inherit"}))
+
+(js/process.exit (or (.-status r) 1))

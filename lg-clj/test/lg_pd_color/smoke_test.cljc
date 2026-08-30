@@ -4,6 +4,7 @@
   run offline (the native task handlers are injectable here, so the result /
   error envelope verifies under bb with stubs)."
   (:require [clojure.test :refer [deftest is testing]]
+            [clojure.string :as str]
             [langgraph.graph :as g]
             [lg-pd-color.server :as server]
             [lg-pd-color.graphs.health :as health]
@@ -106,3 +107,72 @@
     (let [r (server/dispatch-xrpc "com.etzhayyim.apps.pdColor.audioExtractTimedText" {})]
       (is (= 200 (:status r)))
       (is (= {:vtt "WEBVTT"} (get-in r [:body :output]))))))
+
+;; ── envelope + dispatch defaults ────────────────────────────────────────────
+;;
+;; Everything above this line was in the suite when it could only be run by
+;; `bb`. What follows pins the parts of the envelope that the docstrings claim
+;; and nothing read: the 300-char clip, the 120-char clip on a caller-supplied
+;; NSID, the documented `assistant_id` default, the empty-map input, and the
+;; loud boundary for ALL NINE task graphs rather than the one that happened to
+;; be sampled.
+
+(deftest error-message-is-clipped-to-300-chars
+  (testing "the node docstring says `clipped to 300 chars`; an unbounded handler message otherwise lands verbatim in an HTTP body"
+    (let [long-msg (apply str (repeat 500 "x"))]
+      (binding [task/*handlers*
+                (assoc task/default-handlers
+                       "videoEncodePackage"
+                       (fn [_] (throw (ex-info long-msg {}))))]
+        (let [r (server/dispatch-run {:assistant_id "videoEncodePackage" :input {}})]
+          (is (= 500 (:status r)))
+          (is (= 300 (count (get-in r [:body :error])))))))))
+
+(deftest a-thrown-value-without-a-message-still-yields-an-error-string
+  (testing "an empty envelope reads as `the handler succeeded and returned nothing`"
+    (binding [task/*handlers*
+              (assoc task/default-handlers
+                     "videoEnhanceQuality"
+                     (fn [_] (throw (ex-info nil {}))))]
+      (let [r (server/dispatch-run {:assistant_id "videoEnhanceQuality" :input {}})]
+        (is (= 500 (:status r)))
+        (is (seq (get-in r [:body :error])))))))
+
+(deftest every-task-graph-fails-loud-when-its-handler-is-unbound
+  (testing "a deploy that forgets to inject one handler must not report success for that one graph"
+    (doseq [nm task/task-names]
+      (let [r (server/dispatch-run {:assistant_id nm :input {}})]
+        (is (= 500 (:status r)) (str nm " did not fail loud"))
+        (is (re-find #"native worker handler not configured" (get-in r [:body :error]))
+            (str nm " failed for some other reason"))
+        (is (str/includes? (get-in r [:body :error]) nm)
+            (str nm " does not name itself in its own boundary error"))))))
+
+(deftest runs-without-an-assistant-id-is-health
+  (testing "server.py's documented default; a client that omits the field gets liveness, not a 404"
+    (let [r (server/dispatch-run {})]
+      (is (= 200 (:status r)))
+      (is (= {:status "ok" :service "lg-pd-color"} (get-in r [:body :output]))))))
+
+(deftest a-missing-input-reaches-the-handler-as-an-empty-map
+  (testing "not nil — a handler doing (:k kwargs) on nil is a different failure than on {}"
+    (let [seen (atom :never-called)]
+      (binding [task/*handlers*
+                (assoc task/default-handlers
+                       "videoColorizeFrames"
+                       (fn [kwargs] (reset! seen kwargs) {:ok true}))]
+        (let [r (server/dispatch-run {:assistant_id "videoColorizeFrames"})]
+          (is (= 200 (:status r)))
+          (is (= {} @seen)))))))
+
+(deftest an-unmapped-nsid-is-not-echoed-back-unbounded
+  (testing "the NSID is caller-supplied and lands in an error body; server.cljc clips it to 120"
+    (let [r (server/dispatch-xrpc (apply str (repeat 400 "n")) {})]
+      (is (= 501 (:status r)))
+      (is (> 200 (count (get-in r [:body :error])))
+          "the whole caller-supplied NSID came back in the error"))))
+
+(deftest a-mapped-nsid-whose-graph-is-missing-is-404-not-501
+  (testing "501 means `this server does not implement that method`; 404 means the registry is inconsistent — collapsing them hides a broken deploy"
+    (with-redefs [server/GRAPHS (dissoc server/GRAPHS "health")]
+      (is (= 404 (:status (server/dispatch-xrpc "com.etzhayyim.apps.pdColor.health" {})))))))
