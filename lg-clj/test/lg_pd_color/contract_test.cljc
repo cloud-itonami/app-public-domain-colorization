@@ -26,7 +26,7 @@
   before anything is claimed about its contents, and the reachability test
   carries a positive control."
   (:require [clojure.test :refer [deftest is testing]]
-            [clojure.string :as str]
+            [kotoba.lang.text :as str]
             [lg-pd-color.server :as server]
             #?(:cljs ["node:fs" :as fs])))
 
@@ -94,7 +94,7 @@
   "`segmentShots` -> `SegmentShots`. NOT `str/capitalize`, which lower-cases the
   rest and would turn `segmentShots` into `Segmentshots`."
   [s]
-  (str (str/upper-case (subs s 0 1)) (subs s 1)))
+  (str (str/upper (subs s 0 1)) (subs s 1)))
 
 (defn graph-name-of-task-type
   "`pdColor.video.segmentShots` -> `videoSegmentShots`: drop the `pdColor`

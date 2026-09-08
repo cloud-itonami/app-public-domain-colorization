@@ -4,7 +4,7 @@
   run offline (the native task handlers are injectable here, so the result /
   error envelope verifies under bb with stubs)."
   (:require [clojure.test :refer [deftest is testing]]
-            [clojure.string :as str]
+            [kotoba.lang.text :as str]
             [langgraph.graph :as g]
             [lg-pd-color.server :as server]
             [lg-pd-color.graphs.health :as health]
