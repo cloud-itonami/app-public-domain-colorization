@@ -20,7 +20,7 @@
 ;; `contract-test` asserts those two pin the same langgraph.
 (ns run-tests
   (:require ["node:child_process" :as cp]
-            [clojure.string :as str]
+            [kotoba.lang.text :as str]
             [clojure.test :as t]
             [lg-pd-color.contract-test]
             [lg-pd-color.smoke-test]))
