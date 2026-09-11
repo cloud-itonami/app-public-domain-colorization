@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; run_tests.cljk — the repo's test entry point.
 ;;
 ;; The Clojure port lives under `lg-clj/`, which is where its `nbb.edn` and
@@ -7,7 +7,7 @@
 ;; relay its exit code. The green marker below is the child's — printed only
 ;; when nbb AND the JVM are both green (see lg-clj/run_tests.cljk).
 ;;
-;;   nbb run_tests.cljk
+;;   kbb --backend sci run_tests.cljk
 (ns run-tests
   (:require ["node:child_process" :as cp]))
 

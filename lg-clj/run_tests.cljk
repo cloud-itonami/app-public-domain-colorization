@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; run_tests.cljk — the same suite on BOTH runtimes.
 ;;
 ;; These namespaces are `.cljc`, but until this file existed the only runtime
@@ -14,7 +14,7 @@
 ;; compatibility oracle. The green marker prints only when BOTH are green —
 ;; a runner that printed it after one would put the defect above back.
 ;;
-;;   nbb run_tests.cljk
+;;   kbb --backend sci run_tests.cljk
 ;;
 ;; Both halves read the same two files: nbb from nbb.edn, the JVM from deps.edn.
 ;; `contract-test` asserts those two pin the same langgraph.
@@ -36,7 +36,7 @@
   '[lg-pd-color.smoke-test lg-pd-color.contract-test])
 
 (defn- jvm-suite []
-  (println "── JVM (clojure -M:test)")
+  (println "── JVM (kbb -M:test)")
   (let [r (cp/spawnSync "clojure" #js ["-M:test"]
                         #js {:encoding "utf8" :shell false
                              :maxBuffer (* 16 1024 1024)})

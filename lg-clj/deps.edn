@@ -6,8 +6,8 @@
 ;;
 ;; The suite runs on BOTH runtimes and the runner is `run_tests.cljk`:
 ;;
-;;   nbb run_tests.cljk      nbb first (the workspace's script host), JVM after
-;;   clojure -M:test         the JVM half on its own
+;;   kbb --backend sci run_tests.cljk      nbb first (the workspace's script host), JVM after
+;;   kbb -M:test         the JVM half on its own
 ;;
 ;; The dependency is `kotoba-lang/langgraph`, which is where this workspace
 ;; registers the library (west path orgs/kotoba-lang/langgraph). The `bb.edn`
