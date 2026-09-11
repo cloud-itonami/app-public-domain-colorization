@@ -17,7 +17,7 @@
      `default` attribute, one XML attribute per gate, and no test read it.
 
   3. nbb and the JVM are configured from two different files, so the two halves
-     of `run_tests.cljs` can silently test two different library versions.
+     of `run_tests.cljk` can silently test two different library versions.
 
   Reading XML with regular expressions is not a general-purpose parser, and this
   is not one: it pulls named attributes off a committed, well-formed file. The
@@ -198,7 +198,7 @@
   (second (re-find #"io\.github\.kotoba-lang/langgraph\s*\{:git/sha\s+\"([0-9a-f]{40})\"\}" text)))
 
 (deftest nbb-and-the-jvm-test-the-same-langgraph
-  (testing "`run_tests.cljs` claims both runtimes are green; two config files can drift to two libraries"
+  (testing "`run_tests.cljk` claims both runtimes are green; two config files can drift to two libraries"
     (let [d (langgraph-sha (read-text "deps.edn"))
           n (langgraph-sha (read-text "nbb.edn"))]
       (is (some? d) "deps.edn pins no langgraph sha in the expected shape")

@@ -1,5 +1,5 @@
 #!/usr/bin/env nbb
-;; run_tests.cljs — the same suite on BOTH runtimes.
+;; run_tests.cljk — the same suite on BOTH runtimes.
 ;;
 ;; These namespaces are `.cljc`, but until this file existed the only runtime
 ;; that had ever executed them was `bb`, declared in a `bb.edn` — the script
@@ -14,7 +14,7 @@
 ;; compatibility oracle. The green marker prints only when BOTH are green —
 ;; a runner that printed it after one would put the defect above back.
 ;;
-;;   nbb run_tests.cljs
+;;   nbb run_tests.cljk
 ;;
 ;; Both halves read the same two files: nbb from nbb.edn, the JVM from deps.edn.
 ;; `contract-test` asserts those two pin the same langgraph.
