@@ -259,7 +259,7 @@ Current canary publication:
 ## Running the tests
 
 ```sh
-nbb run_tests.cljk
+kbb --backend sci run_tests.cljk
 ```
 
 The suite runs on **both** runtimes and prints its green marker only when both
@@ -271,7 +271,7 @@ lg-pd-color: both runtimes green (nbb + JVM)
 ```
 
 The Clojure port under `lg-clj/` is configured by `lg-clj/nbb.edn` (nbb) and
-`lg-clj/deps.edn` (`clojure -M:test`), both pinning the same
+`lg-clj/deps.edn` (`kbb -M:test`), both pinning the same
 `kotoba-lang/langgraph` revision. `lg-clj/run_tests.cljk` is the runner;
 the file at the repo root is a launcher that runs it from `lg-clj/`.
 
