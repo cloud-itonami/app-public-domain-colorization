@@ -4,9 +4,9 @@
 ;;   src   — lg-pd-color.* namespaces (graphs + server + dispatch)
 ;;   test  — lg-pd-color.smoke-test, lg-pd-color.contract-test
 ;;
-;; The suite runs on BOTH runtimes and the runner is `run_tests.cljs`:
+;; The suite runs on BOTH runtimes and the runner is `run_tests.cljk`:
 ;;
-;;   nbb run_tests.cljs      nbb first (the workspace's script host), JVM after
+;;   nbb run_tests.cljk      nbb first (the workspace's script host), JVM after
 ;;   clojure -M:test         the JVM half on its own
 ;;
 ;; The dependency is `kotoba-lang/langgraph`, which is where this workspace
