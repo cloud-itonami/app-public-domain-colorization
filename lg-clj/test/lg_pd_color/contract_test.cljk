@@ -25,7 +25,7 @@
   contract as satisfied, so every derived collection is asserted non-empty
   before anything is claimed about its contents, and the reachability test
   carries a positive control."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [kotoba.lang.text :as str]
             [lg-pd-color.server :as server]
             #?(:cljs ["node:fs" :as fs])))
