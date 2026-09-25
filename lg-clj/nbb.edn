@@ -3,6 +3,10 @@
 ;; deps.edn pins, and `contract-test` fails if the two ever drift apart.
 {:paths ["src" "test"]
  :deps {
+        ;; kotoba.test (clojure.test-compatible surface), not clojure.test --
+        ;; scripts/migrate-clojure-test-to-kotoba-test.cljk. Explicit floor.
+        io.github.kotoba-lang/test {:git/url "https://github.com/kotoba-lang/test.git"
+                                    :git/sha "448f1bf71dcbfa6bf11bf99248b6e225f51eea02"}
         ;; Declared HERE and not only in deps.edn: nbb reads nbb.edn and does NOT
         ;; read deps.edn or bb.edn, and the .cljs in this repo are run as
         ;; bare `nbb <file>`. A coordinate they cannot see is not a
